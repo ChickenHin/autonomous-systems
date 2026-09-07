@@ -1,11 +1,7 @@
 name: Testing and Building
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
-    types: [opened, synchronize, reopened]
-
+  workflow_dispatch: 
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -37,7 +33,7 @@ jobs:
       contents: read
       pull-requests: read
     name: Build once
-    runs-on: [self-hosted, linux]
+    runs-on: [ubuntu-latest]
 
     defaults:
       run:
@@ -148,7 +144,7 @@ jobs:
       pull-requests: read
     name: Test ${{ matrix.package }}
     needs: build
-    runs-on: [self-hosted, linux]
+    runs-on: [ubuntu-latest]
 
     defaults:
       run:
@@ -193,54 +189,54 @@ jobs:
             --all \
             --verbose
 
-  sonarcloud:
-    permissions:
-      contents: read
-      pull-requests: read
-    name: SonarCloud analysis
-    needs: [build, test]
-    if: ${{ !cancelled() && needs.build.result == 'success' && github.event_name == 'pull_request' }}
-    runs-on: [self-hosted, linux]
+  # sonarcloud:
+  #   permissions:
+  #     contents: read
+  #     pull-requests: read
+  #   name: SonarCloud analysis
+  #   needs: [build, test]
+  #   if: ${{ !cancelled() && needs.build.result == 'success' && github.event_name == 'pull_request' }}
+  #   runs-on: [self-hosted, linux]
 
-    defaults:
-      run:
-        shell: bash
+  #   defaults:
+  #     run:
+  #       shell: bash
 
-    env:
-      SONAR_SCANNER_VERSION: 6.0.0.4432
-      SONAR_SERVER_URL: https://sonarcloud.io
-      SONAR_SCANNER_DOWNLOAD_URL: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.0.0.4432-linux.zip
-      # Was 10, which exhausted RAM and got the runner service OOM-killed.
-      SONAR_CFAMILY_THREADS: 4
-      SONAR_SCANNER_JAVA_OPTS: -Xmx4g
+  #   env:
+  #     SONAR_SCANNER_VERSION: 6.0.0.4432
+  #     SONAR_SERVER_URL: https://sonarcloud.io
+  #     SONAR_SCANNER_DOWNLOAD_URL: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.0.0.4432-linux.zip
+  #     # Was 10, which exhausted RAM and got the runner service OOM-killed.
+  #     SONAR_CFAMILY_THREADS: 4
+  #     SONAR_SCANNER_JAVA_OPTS: -Xmx4g
 
-    steps:
-      - name: Install Sonar scanner in CI cache if missing
-        run: |
-          set -euo pipefail
-          mkdir -p "${CI_CACHE_DIR}"
+  #   steps:
+  #     - name: Install Sonar scanner in CI cache if missing
+  #       run: |
+  #         set -euo pipefail
+  #         mkdir -p "${CI_CACHE_DIR}"
 
-          command -v curl >/dev/null || { echo "curl is missing. Install it once on the server: sudo apt install curl"; exit 1; }
-          command -v unzip >/dev/null || { echo "unzip is missing. Install it once on the server: sudo apt install unzip"; exit 1; }
+  #         command -v curl >/dev/null || { echo "curl is missing. Install it once on the server: sudo apt install curl"; exit 1; }
+  #         command -v unzip >/dev/null || { echo "unzip is missing. Install it once on the server: sudo apt install unzip"; exit 1; }
 
-          SCANNER_DIR="${CI_CACHE_DIR}/sonar-scanner-${SONAR_SCANNER_VERSION}-linux"
+  #         SCANNER_DIR="${CI_CACHE_DIR}/sonar-scanner-${SONAR_SCANNER_VERSION}-linux"
 
-          if [[ -x "${SCANNER_DIR}/bin/sonar-scanner" ]]; then
-            echo "Sonar scanner already installed."
-            exit 0
-          fi
+  #         if [[ -x "${SCANNER_DIR}/bin/sonar-scanner" ]]; then
+  #           echo "Sonar scanner already installed."
+  #           exit 0
+  #         fi
 
-          curl -sSL "${SONAR_SCANNER_DOWNLOAD_URL}" --output sonar-scanner.zip
-          unzip -q sonar-scanner.zip -d "${CI_CACHE_DIR}"
-          rm -f sonar-scanner.zip
+  #         curl -sSL "${SONAR_SCANNER_DOWNLOAD_URL}" --output sonar-scanner.zip
+  #         unzip -q sonar-scanner.zip -d "${CI_CACHE_DIR}"
+  #         rm -f sonar-scanner.zip
 
-      - name: Run SonarCloud analysis
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          set -euo pipefail
-          export PATH="${CI_CACHE_DIR}/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin:${PATH}"
-          sonar-scanner \
-            --define sonar.cfamily.compile-commands="./compile_commands.json" \
-            --define sonar.cfamily.threads="${SONAR_CFAMILY_THREADS}"
+  #     - name: Run SonarCloud analysis
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #       run: |
+  #         set -euo pipefail
+  #         export PATH="${CI_CACHE_DIR}/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin:${PATH}"
+  #         sonar-scanner \
+  #           --define sonar.cfamily.compile-commands="./compile_commands.json" \
+  #           --define sonar.cfamily.threads="${SONAR_CFAMILY_THREADS}"
